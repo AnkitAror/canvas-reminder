@@ -2,9 +2,9 @@ name: Canvas daily digest
 
 on:
   schedule:
-    # GitHub cron is UTC. 12:00 UTC = 7:00 AM US Eastern (standard time) / 8:00 AM (daylight time).
+    # GitHub cron is UTC. 11:37 UTC = 6:37 AM US Eastern (standard) / 7:37 AM (daylight). Off the top of the hour to avoid GitHub dropping/delaying runs under load.
     # Adjust for your timezone. GitHub may start scheduled runs 5-30 min late.
-    - cron: "0 12 * * *"
+    - cron: "37 11 * * *"
   workflow_dispatch: {}
 
 jobs:
