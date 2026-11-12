@@ -62,7 +62,8 @@ def main():
         data["done_marks_error"] = True
 
     data = process(data, done_ids)
-    print(f"Merged {data['duplicates_merged']} duplicate(s); hid {data['hidden_done']} completed item(s)")
+    print(f"Excluded {data['excluded']} by rules; merged {data['duplicates_merged']} duplicate(s); "
+          f"hid {data['hidden_done']} completed item(s)")
 
     subject, html_body, text_body = build(data)
     if args.dry_run:

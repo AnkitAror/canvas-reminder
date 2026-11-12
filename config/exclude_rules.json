@@ -1,0 +1,10 @@
+{
+  "_help": "Items matching ANY rule are left out of the digest. 'course' and 'title' are case-insensitive regexes (matched anywhere). A rule with only one of them matches on that field alone.",
+  "rules": [
+    {
+      "note": "Career Explorations practice assignments",
+      "course": "01:090:210|CAREER EXPLORATIONS",
+      "title": "^\\s*PRACTICE\\s*#"
+    }
+  ]
+}

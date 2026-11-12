@@ -198,6 +198,8 @@ def build(data):
     stats = []
     if data.get("hidden_done"):
         stats.append(f"{data['hidden_done']} completed item(s) hidden")
+    if data.get("excluded"):
+        stats.append(f"{data['excluded']} item(s) excluded by your rules")
     if data.get("duplicates_merged"):
         stats.append(f"{data['duplicates_merged']} duplicate(s) merged")
     if data.get("done_marks_error"):

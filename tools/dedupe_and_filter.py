@@ -10,8 +10,12 @@ Two items are duplicates when ALL of these hold:
     so "01:640:350:03 LINEAR ALGEBRA" ~ "01:640:350:03 (COPY)"); when a course has no code,
     names must match once "(COPY)" is removed
 """
+import json
 import re
 from difflib import SequenceMatcher
+from pathlib import Path
+
+RULES_PATH = Path(__file__).resolve().parent.parent / "config" / "exclude_rules.json"
 
 CODE_RE = re.compile(r"\b(\d{2}:\d{3}:\d{3})")  # Rutgers style school:subject:course
 TITLE_SIMILARITY = 0.9
@@ -87,9 +91,25 @@ def _merge(group, done_ids):
     return merged
 
 
-def process(data, done_ids=frozenset()):
-    """Mutates and returns data: items become merged, not-completed groups."""
-    groups = group_duplicates(data["items"])
+def load_exclude_rules(path=RULES_PATH):
+    if not path.exists():
+        return []
+    rules = json.loads(path.read_text()).get("rules", [])
+    return [{k: re.compile(r[k], re.IGNORECASE) for k in ("course", "title") if r.get(k)}
+            for r in rules if r.get("course") or r.get("title")]
+
+
+def is_excluded(item, rules):
+    return any(all(rx.search(item.get(field) or "") for field, rx in rule.items()) for rule in rules)
+
+
+def process(data, done_ids=frozenset(), rules=None):
+    """Mutates and returns data: drop excluded items, then merge duplicates and drop
+    completed groups."""
+    rules = load_exclude_rules() if rules is None else rules
+    kept = [i for i in data["items"] if not is_excluded(i, rules)]
+    data["excluded"] = len(data["items"]) - len(kept)
+    groups = group_duplicates(kept)
     merged = [_merge(g, set(done_ids)) for g in groups]
     data["duplicates_merged"] = sum(len(g) - 1 for g in groups)
     data["hidden_done"] = sum(1 for m in merged if m["completed"])

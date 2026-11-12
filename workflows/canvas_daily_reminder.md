@@ -57,6 +57,12 @@ Send one Gmail each morning that lists:
 
   Same title and due date in *different* courses is NOT a duplicate. That bug was fixed: an early version treated any "(COPY)" course as related to every course. The email shows the real course, followed by "(+ duplicate in …)".
 
+## Exclusion rules
+- **Where:** `config/exclude_rules.json`. Each rule has an optional `course` regex and an optional `title` regex, both case-insensitive. An item is dropped when every field set in a rule matches.
+- **When:** rules are applied before duplicate grouping.
+- **Current rule:** Career Explorations (`01:090:210`) items whose title starts with `PRACTICE #`.
+- **To add a rule:** edit the JSON, then commit and push. GitHub Actions reads the file from the repo.
+
 ## Completion
 - **If ANY member of a duplicate group is completed, the whole group is done and hidden.** Completion is applied *after* grouping. That's why the fetchers keep completed items instead of dropping them.
 - **API mode:** `submissions.submitted` or the planner's `marked_complete` counts as completed.
