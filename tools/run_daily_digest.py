@@ -1,4 +1,5 @@
-"""Entry point: fetch Canvas data -> build digest -> send Gmail.
+"""Entry point: fetch Canvas data -> read done marks -> merge duplicates & drop completed
+-> build digest -> send Gmail.
 
 Usage:
   python tools/run_daily_digest.py            # fetch + send
@@ -12,6 +13,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from build_digest_email import build  # noqa: E402
 from canvas_client import CanvasAuthError  # noqa: E402
+from dedupe_and_filter import process  # noqa: E402
+from read_done_marks import read_done_ids  # noqa: E402
 from fetch_canvas_data import main as fetch_api  # noqa: E402
 from fetch_canvas_ics import main as fetch_ics  # noqa: E402
 from send_gmail import send_email  # noqa: E402
@@ -48,6 +51,18 @@ def main():
                 "and in your GitHub repo secrets.",
             )
         sys.exit(1)
+
+    # Manual "✓ Done" marks from Gmail. A failure here must not block the digest.
+    try:
+        done_ids = read_done_ids()
+        print(f"{len(done_ids)} item(s) marked done via email")
+    except Exception as exc:  # noqa: BLE001
+        print(f"WARNING: could not read done marks from Gmail: {exc}", file=sys.stderr)
+        done_ids = set()
+        data["done_marks_error"] = True
+
+    data = process(data, done_ids)
+    print(f"Merged {data['duplicates_merged']} duplicate(s); hid {data['hidden_done']} completed item(s)")
 
     subject, html_body, text_body = build(data)
     if args.dry_run:

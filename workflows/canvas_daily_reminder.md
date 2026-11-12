@@ -30,14 +30,17 @@ Send one Gmail each morning that lists:
    - `/planner/items` (assignments, quizzes, discussions, to-dos)
    - `/calendar_events?type=event` (exams and other events)
    - `/announcements`
+   (In calendar feed mode, `tools/fetch_canvas_ics.py` does this step instead.)
 2. `tools/build_digest_email.py` builds the subject, HTML and text. The sections are:
    - Due in 48h
    - Exams & quizzes
    - Later, grouped by course
    - Announcements
-3. `tools/send_gmail.py` sends over SMTP_SSL to smtp.gmail.com:465.
+3. `tools/read_done_marks.py` reads manual "✓ Done" marks from Gmail over IMAP, using the same app password (see Completion below).
+4. `tools/dedupe_and_filter.py` merges duplicate assignments, then drops every group that has a completed member.
+5. `tools/send_gmail.py` sends over SMTP_SSL to smtp.gmail.com:465.
 
-`tools/run_daily_digest.py` runs all three steps. Use `--dry-run` to write `.tmp/digest.html` without sending anything.
+`tools/run_daily_digest.py` runs all five steps. Use `--dry-run` to write `.tmp/digest.html` without sending anything.
 
 ## Schedule
 `.github/workflows/daily_digest.yml` runs at cron `0 12 * * *` (UTC). You can also trigger it manually from the Actions tab (`workflow_dispatch`). Change the cron line when you change timezones; GitHub cron does not adjust for DST.
@@ -45,9 +48,28 @@ Send one Gmail each morning that lists:
 ## Edge cases & behavior
 - **Canvas returns 401** (token expired or revoked): the job sends a "token invalid" alert email and exits with code 1, so the Actions run shows as failed.
 - **Nothing due and no announcements:** an "all clear" email still goes out, so you know the job ran.
-- **Hidden items:** submitted items and planner items marked complete are hidden. Items with no date are skipped.
+- **Hidden items:** an item is hidden when it is completed (see Completion below). Items with no date are skipped.
 - **Exam detection:** an item counts as an exam if it is a `quiz` type, or if its title matches exam/midterm/final/quiz/test. Expect some false positives, such as "Test your setup".
-- **Duplicates:** items with the same title, course and due minute are collapsed into one.
+- **Duplicates** (`dedupe_and_filter.py`): items are merged when all three of these hold:
+  - they are due at the same minute
+  - their titles match after normalization, or are at least 90% similar
+  - their courses are related: the same name, or the same Rutgers course code `NN:NNN:NNN` (for example `01:640:350:03 LINEAR ALGEBRA` and `01:640:350:03 (COPY)`). When a course has no code, the names must match once "(COPY)" is removed.
+
+  Same title and due date in *different* courses is NOT a duplicate. That bug was fixed: an early version treated any "(COPY)" course as related to every course. The email shows the real course, followed by "(+ duplicate in …)".
+
+## Completion
+- **If ANY member of a duplicate group is completed, the whole group is done and hidden.** Completion is applied *after* grouping. That's why the fetchers keep completed items instead of dropping them.
+- **API mode:** `submissions.submitted` or the planner's `marked_complete` counts as completed.
+- **Calendar feed mode:** the feed has no submission status, so completion is manual.
+  - Each item has a **✓ Done** mailto link. It sends an email to `GMAIL_ADDRESS` with the subject `[Canvas Done] <title> | <id>,<id>`.
+  - On the next run, `read_done_marks.py` searches `[Gmail]/All Mail` for `subject:(Canvas Done) newer_than:180d` (set by `DONE_MARK_LOOKBACK_DAYS`).
+  - It only trusts emails sent From `GMAIL_ADDRESS` or `DIGEST_TO`.
+  - **Undo:** delete the Done email. Trash is not part of All Mail.
+- **IDs:** an item's ID is its Canvas UID, for example `assignment_4383111`. The Done email carries the IDs of every member of the group.
+- **If reading Gmail fails,** the digest still sends, with a warning in the footer saying done items may reappear.
+- **Tested 2026-11-11:**
+  - Marking only the `(COPY)` HW #10 done hid the Linear Algebra copy as well.
+  - Trashing the Done email brought the item back.
 
 ## Known quirks
 - Canvas limits `context_codes[]` to 10 per request, so the tools batch course codes in groups of 10.

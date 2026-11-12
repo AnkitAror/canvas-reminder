@@ -66,12 +66,15 @@ def fetch_planner_items(client, courses, start, end):
             continue
         subs = it.get("submissions") or {}
         submitted = bool(subs.get("submitted")) if isinstance(subs, dict) else False
-        if submitted or (it.get("planner_override") or {}).get("marked_complete"):
-            continue
+        # Keep completed items: dedupe_and_filter needs them so a completed duplicate
+        # also hides its unsubmitted copy.
+        completed = submitted or bool((it.get("planner_override") or {}).get("marked_complete"))
         title = p.get("title") or p.get("name") or "(untitled)"
         course_id = it.get("course_id")
         course = courses.get(course_id, {}).get("name") or it.get("context_name") or "Personal"
         out.append({
+            "id": f"{ptype}_{it.get('plannable_id')}",
+            "completed": completed,
             "kind": ptype,
             "title": title,
             "course": course,
@@ -99,6 +102,8 @@ def fetch_calendar_events(client, courses, start, end):
             cid = int(str(ev.get("context_code", "_0")).split("_")[-1] or 0)
             title = ev.get("title") or "(untitled event)"
             out.append({
+                "id": f"calendar_event_{ev.get('id')}",
+                "completed": False,
                 "kind": "calendar_event",
                 "title": title,
                 "course": courses.get(cid, {}).get("name", ev.get("context_name", "")),
@@ -146,14 +151,8 @@ def main():
     courses = fetch_courses(client)
     items = fetch_planner_items(client, courses, now, end)
     items += fetch_calendar_events(client, courses, now, end)
-    # de-duplicate (same title + course + due time)
-    seen, deduped = set(), []
-    for it in items:
-        key = (it["title"].strip().lower(), it["course"], it["due_at"][:16])
-        if key not in seen:
-            seen.add(key)
-            deduped.append(it)
-    deduped.sort(key=lambda i: i["due_at"])
+    # Duplicates and completed items are handled later by dedupe_and_filter.process()
+    deduped = sorted(items, key=lambda i: i["due_at"])
     announcements = fetch_announcements(client, courses, now - timedelta(hours=lookback_h), now)
 
     data = {

@@ -69,8 +69,12 @@ def fetch_ics(url, now, end, tz):
         title = COURSE_RE.sub("", summary).strip() or "(untitled)"
         if course:
             courses.add(course)
-        kind = _kind(str(ev.get("UID", "")))
+        uid = str(ev.get("UID", ""))
+        kind = _kind(uid)
         items.append({
+            # "event-assignment-4383111" -> "assignment_4383111" (stable ID for done marks)
+            "id": uid.removeprefix("event-").replace("-", "_"),
+            "completed": False,  # the .ics feed has no submission status
             "kind": kind,
             "title": title,
             "course": course or "Calendar",

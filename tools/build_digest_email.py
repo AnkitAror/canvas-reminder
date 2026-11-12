@@ -11,6 +11,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from html.parser import HTMLParser
 from pathlib import Path
+from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
@@ -54,6 +55,24 @@ def html_to_text(s):
 def excerpt(s, n=EXCERPT_CHARS):
     text = html_to_text(s)
     return text if len(text) <= n else text[:n].rsplit(" ", 1)[0] + "…"
+
+
+def done_link(item):
+    """mailto: link that sends a "[Canvas Done]" email to yourself (read by read_done_marks.py)."""
+    to = os.environ.get("GMAIL_ADDRESS", "")
+    ids = item.get("ids") or ([item["id"]] if item.get("id") else [])
+    if not to or not ids:
+        return ""
+    title = re.sub(r"[|\r\n]+", " ", item["title"])[:80]
+    subject = f"[Canvas Done] {title} | {','.join(ids)}"
+    body = ("Send this email to mark the assignment done; it will be hidden from tomorrow's "
+            "digest. To undo, delete this email (from Sent, and Inbox if it shows up there).")
+    return f"mailto:{to}?subject={quote(subject)}&body={quote(body)}"
+
+
+def _course_label(item):
+    extra = item.get("also_in") or []
+    return item["course"] + (f" (+ duplicate in {', '.join(extra)})" if extra else "")
 
 
 def _local(ts, tz):
@@ -102,7 +121,7 @@ def build(data):
         t.append(title)
         for i in rows:
             tag = "[EXAM] " if i["is_exam"] else ""
-            t.append(f"  - {tag}{i['title']} ({i['course']}): {_fmt_when(i['local'], today)}")
+            t.append(f"  - {tag}{i['title']} ({_course_label(i)}): {_fmt_when(i['local'], today)}")
             t.append(f"    {i['url']}")
         t.append("")
 
@@ -132,11 +151,15 @@ def build(data):
         pts = f" · {i['points']:g} pts" if isinstance(i.get("points"), (int, float)) else ""
         exam = ('<span style="background:#ffebe9;color:#cf222e;border-radius:4px;'
                 'padding:1px 6px;font-size:12px;margin-left:6px">EXAM</span>') if i["is_exam"] else ""
+        link = done_link(i)
+        done = (f'<a href="{e(link)}" style="float:right;font-size:12px;color:#1a7f37;'
+                'border:1px solid #1a7f37;border-radius:12px;padding:1px 8px;text-decoration:none;'
+                'margin-left:8px">✓ Done</a>') if link else ""
         return (f'<div style="border-left:4px solid {accent};padding:6px 10px;margin:6px 0;'
-                f'background:#f6f8fa;border-radius:4px">'
+                f'background:#f6f8fa;border-radius:4px">{done}'
                 f'<a href="{e(i["url"])}" style="color:#0969da;font-weight:600;text-decoration:none">'
                 f'{e(i["title"])}</a>{exam}<br>'
-                f'<span style="color:#656d76;font-size:13px">{e(i["course"])} · {e(kind)}{pts} · '
+                f'<span style="color:#656d76;font-size:13px">{e(_course_label(i))} · {e(kind)}{pts} · '
                 f'<b>{e(_fmt_when(i["local"], today))}</b></span></div>')
 
     def section(title, rows, accent, group_by_course=False):
@@ -172,10 +195,21 @@ def build(data):
     if not items and not anns:
         h.append('<p style="font-size:16px">Nothing due in the look-ahead window and no new '
                  'announcements. 🎉</p>')
-    note = ("Built from your Canvas calendar feed: submitted items still appear."
-            if data.get("source") == "ics" else "Submitted items are hidden.")
-    h.append('<p style="color:#8c959f;font-size:12px;margin-top:24px">Sent automatically by your '
-             f'Canvas Reminder. {note}</p></div>')
+    stats = []
+    if data.get("hidden_done"):
+        stats.append(f"{data['hidden_done']} completed item(s) hidden")
+    if data.get("duplicates_merged"):
+        stats.append(f"{data['duplicates_merged']} duplicate(s) merged")
+    if data.get("done_marks_error"):
+        stats.append("⚠️ couldn't read your Done marks today, so done items may reappear")
+    note = "Tap ✓ Done and send the email it opens to hide an item (delete that email to undo)."
+    if data.get("source") != "ics":
+        note = "Submitted items are hidden automatically. " + note
+    h.append('<p style="color:#8c959f;font-size:12px;margin-top:24px">'
+             + (e(" · ".join(stats)) + "<br>" if stats else "")
+             + f'Sent automatically by your Canvas Reminder. {e(note)}</p></div>')
+    if stats:
+        text += "\n\n" + " · ".join(stats)
 
     return subject, "".join(h), text
 
