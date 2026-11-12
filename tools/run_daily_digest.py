@@ -5,14 +5,25 @@ Usage:
   python tools/run_daily_digest.py --dry-run  # fetch + write .tmp/digest.html, no email
 """
 import argparse
+import os
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from build_digest_email import build  # noqa: E402
 from canvas_client import CanvasAuthError  # noqa: E402
-from fetch_canvas_data import main as fetch  # noqa: E402
+from fetch_canvas_data import main as fetch_api  # noqa: E402
+from fetch_canvas_ics import main as fetch_ics  # noqa: E402
 from send_gmail import send_email  # noqa: E402
+
+
+def fetch():
+    """Prefer the API (richer: announcements, submission status); fall back to the .ics feed."""
+    if os.environ.get("CANVAS_API_TOKEN"):
+        return fetch_api()
+    if os.environ.get("CANVAS_ICS_URL"):
+        return fetch_ics()
+    raise RuntimeError("Set CANVAS_API_TOKEN (+ CANVAS_API_URL) or CANVAS_ICS_URL in .env.")
 
 ROOT = Path(__file__).resolve().parent.parent
 

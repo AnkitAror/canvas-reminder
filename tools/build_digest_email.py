@@ -172,8 +172,10 @@ def build(data):
     if not items and not anns:
         h.append('<p style="font-size:16px">Nothing due in the look-ahead window and no new '
                  'announcements. 🎉</p>')
+    note = ("Built from your Canvas calendar feed: submitted items still appear."
+            if data.get("source") == "ics" else "Submitted items are hidden.")
     h.append('<p style="color:#8c959f;font-size:12px;margin-top:24px">Sent automatically by your '
-             'Canvas Reminder. Submitted items are hidden.</p></div>')
+             f'Canvas Reminder. {note}</p></div>')
 
     return subject, "".join(h), text
 

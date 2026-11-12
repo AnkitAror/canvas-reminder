@@ -20,6 +20,7 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Build and send digest
         env:
+          CANVAS_ICS_URL: ${{ secrets.CANVAS_ICS_URL }}
           CANVAS_API_URL: ${{ secrets.CANVAS_API_URL }}
           CANVAS_API_TOKEN: ${{ secrets.CANVAS_API_TOKEN }}
           GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}

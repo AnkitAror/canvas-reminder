@@ -18,6 +18,12 @@ Send one Gmail each morning that lists:
 | `LOOKAHEAD_DAYS` | variable | Default 7 |
 | `ANNOUNCEMENT_LOOKBACK_HOURS` | variable | Default 24. Keep it the same as the run interval. |
 
+## Data source modes
+- **Calendar feed mode (current):** used when `CANVAS_ICS_URL` is set and `CANVAS_API_TOKEN` is blank. `tools/fetch_canvas_ics.py` reads the Canvas Calendar Feed (Canvas → Calendar → "Calendar Feed"). It gets due dates and exams from all courses. It has no announcements, and submitted items still appear. Use this when the school blocks student access tokens.
+  - The course name comes from the `[Course Name]` suffix that Canvas adds to each event title.
+  - All-day events are treated as due at 11:59 PM local time.
+- **API mode:** used when `CANVAS_API_TOKEN` is set. It adds announcements and hides submitted items. `run_daily_digest.py` prefers this mode automatically whenever a token is present.
+
 ## Tools (run in this order)
 1. `tools/fetch_canvas_data.py` writes `.tmp/canvas_digest.json`. It pulls from these endpoints:
    - `/courses` (active only)
