@@ -7,6 +7,7 @@ import smtplib
 import ssl
 from email.message import EmailMessage
 
+import certifi
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -26,7 +27,9 @@ def send_email(subject, html_body, text_body):
     msg.set_content(text_body)
     msg.add_alternative(html_body, subtype="html")
 
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=ssl.create_default_context()) as s:
+    # Use certifi's CA bundle: python.org macOS builds ship without system certs.
+    context = ssl.create_default_context(cafile=certifi.where())
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as s:
         s.login(sender, password)
         s.send_message(msg)
     print(f"Sent '{subject}' to {to}")
