@@ -1,0 +1,31 @@
+name: Canvas daily digest
+
+on:
+  schedule:
+    # GitHub cron is UTC. 12:00 UTC = 7:00 AM US Eastern (standard time) / 8:00 AM (daylight time).
+    # Adjust for your timezone. GitHub may start scheduled runs 5-30 min late.
+    - cron: "0 12 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Build and send digest
+        env:
+          CANVAS_API_URL: ${{ secrets.CANVAS_API_URL }}
+          CANVAS_API_TOKEN: ${{ secrets.CANVAS_API_TOKEN }}
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          DIGEST_TO: ${{ secrets.DIGEST_TO }}
+          TIMEZONE: ${{ vars.TIMEZONE || 'America/New_York' }}
+          LOOKAHEAD_DAYS: ${{ vars.LOOKAHEAD_DAYS || '7' }}
+          ANNOUNCEMENT_LOOKBACK_HOURS: ${{ vars.ANNOUNCEMENT_LOOKBACK_HOURS || '24' }}
+        run: python tools/run_daily_digest.py

@@ -1,0 +1,51 @@
+# Workflow: Canvas Daily Reminder
+
+## Objective
+Send one Gmail each morning that lists:
+- what's due soon in the user's active Canvas courses
+- upcoming exams and quizzes
+- instructor announcements posted in the last 24 hours
+
+## Required inputs (`.env` locally, GitHub secrets/variables in CI)
+| Key | Where | Notes |
+|---|---|---|
+| `CANVAS_API_URL` | secret | Your school's Canvas base URL, e.g. `https://school.instructure.com` |
+| `CANVAS_API_TOKEN` | secret | Canvas → Account → Settings → "+ New Access Token". Set an expiry date and record it here. |
+| `GMAIL_ADDRESS` | secret | The Gmail account that sends the digest |
+| `GMAIL_APP_PASSWORD` | secret | https://myaccount.google.com/apppasswords (needs 2-Step Verification). Spaces are stripped automatically. |
+| `DIGEST_TO` | secret (optional) | Recipient. Defaults to `GMAIL_ADDRESS`. |
+| `TIMEZONE` | variable | IANA name, e.g. `America/Chicago`. Default is `America/New_York`. |
+| `LOOKAHEAD_DAYS` | variable | Default 7 |
+| `ANNOUNCEMENT_LOOKBACK_HOURS` | variable | Default 24. Keep it the same as the run interval. |
+
+## Tools (run in this order)
+1. `tools/fetch_canvas_data.py` writes `.tmp/canvas_digest.json`. It pulls from these endpoints:
+   - `/courses` (active only)
+   - `/planner/items` (assignments, quizzes, discussions, to-dos)
+   - `/calendar_events?type=event` (exams and other events)
+   - `/announcements`
+2. `tools/build_digest_email.py` builds the subject, HTML and text. The sections are:
+   - Due in 48h
+   - Exams & quizzes
+   - Later, grouped by course
+   - Announcements
+3. `tools/send_gmail.py` sends over SMTP_SSL to smtp.gmail.com:465.
+
+`tools/run_daily_digest.py` runs all three steps. Use `--dry-run` to write `.tmp/digest.html` without sending anything.
+
+## Schedule
+`.github/workflows/daily_digest.yml` runs at cron `0 12 * * *` (UTC). You can also trigger it manually from the Actions tab (`workflow_dispatch`). Change the cron line when you change timezones; GitHub cron does not adjust for DST.
+
+## Edge cases & behavior
+- **Canvas returns 401** (token expired or revoked): the job sends a "token invalid" alert email and exits with code 1, so the Actions run shows as failed.
+- **Nothing due and no announcements:** an "all clear" email still goes out, so you know the job ran.
+- **Hidden items:** submitted items and planner items marked complete are hidden. Items with no date are skipped.
+- **Exam detection:** an item counts as an exam if it is a `quiz` type, or if its title matches exam/midterm/final/quiz/test. Expect some false positives, such as "Test your setup".
+- **Duplicates:** items with the same title, course and due minute are collapsed into one.
+
+## Known quirks
+- Canvas limits `context_codes[]` to 10 per request, so the tools batch course codes in groups of 10.
+- Some schools disable student access tokens. In that case, fall back to the Canvas calendar iCal feed (Calendar → Calendar Feed). It has due dates only, no announcements.
+- GitHub scheduled runs can start 5–30 minutes late.
+- GitHub disables schedules on **public** repos after 60 days without activity, so keep the repo private.
+- Gmail app passwords are revoked whenever the Google account password changes.
