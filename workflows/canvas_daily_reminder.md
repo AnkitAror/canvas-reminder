@@ -55,3 +55,6 @@ Send one Gmail each morning that lists:
 - GitHub scheduled runs can start 5–30 minutes late.
 - GitHub disables schedules on **public** repos after 60 days without activity, so keep the repo private.
 - Gmail app passwords are revoked whenever the Google account password changes.
+- School Google accounts (e.g. @scarletmail.rutgers.edu) block app passwords: Google shows "The setting you are looking for is not available". Send from a personal @gmail.com account instead, and set `DIGEST_TO` if the digest should land in the school inbox.
+- python.org builds of Python on macOS ship without system CA certificates, which causes `CERTIFICATE_VERIFY_FAILED` on SMTP. `send_gmail.py` passes certifi's CA bundle to fix this.
+- Rutgers' calendar feed also lists cross-listed "(COPY)" course shells, so the same assignment can appear twice.
